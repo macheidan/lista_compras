@@ -632,7 +632,18 @@ async function initData() {
 
     onValue(dbRef, snap => {
       const val = snap.val();
-      data = val ? val : JSON.parse(JSON.stringify(defaultData));
+      if (val) {
+        // Firebase pode retornar objetos em vez de arrays — normaliza
+        const suppliers = Array.isArray(val) ? val : Object.values(val);
+        data = suppliers.map(s => ({
+          ...s,
+          items: s.items
+            ? (Array.isArray(s.items) ? s.items : Object.values(s.items))
+            : []
+        }));
+      } else {
+        data = JSON.parse(JSON.stringify(defaultData));
+      }
       nextId = calcNextId();
       setSyncStatus('online');
       render();
