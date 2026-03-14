@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos — Pizzaria</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      padding-top: 54px;
+    }
+
+    /* ── Nav bar ── */
+    .nav-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: linear-gradient(to right, #CB1847, #FC2757);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .nav-bar select {
+      flex: 1;
+      max-width: 320px;
+      padding: 7px 12px;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .nav-bar select option { background: #222; color: #fff; }
+
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: rgba(255,255,255,.7);
+      margin-left: auto;
+    }
+    .sync-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.4);
+    }
+    .sync-dot.online  { background: #00e676; box-shadow: 0 0 5px #00e676; }
+    .sync-dot.offline { background: #ff5252; }
+
+    /* ── Content ── */
+    .content {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 20px 14px 80px;
+    }
+
+    /* ── Setup banner ── */
+    .setup-banner {
+      background: #120900;
+      border: 1.5px solid #FE7C01;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #bbb;
+      line-height: 1.7;
+      margin-bottom: 22px;
+    }
+    .setup-banner strong { color: #FEB50A; }
+    .setup-banner code {
+      background: #2a1500;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .setup-banner ol { margin: 6px 0 0 18px; }
+
+    /* ── Supplier section ── */
+    .supplier-section { margin-bottom: 50px; }
+
+    /* ── Table ── */
+    .pedido-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* Supplier name row */
+    .pedido-table thead tr.row-supplier-name th {
+      background: linear-gradient(to right, #CB1847, #FC2757);
+      text-align: center;
+      font-size: 17px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 13px 10px;
+      position: relative;
+    }
+    .supplier-name-text { flex: 1; }
+
+    /* Column headers */
+    .pedido-table thead tr.row-col-headers th {
+      background: #1c1c1c;
+      color: #aaa;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 8px;
+      border-bottom: 1px solid #333;
+    }
+    .pedido-table thead tr.row-col-headers th.col-pedido { text-align: center; width: 1%; white-space: nowrap; }
+    .pedido-table thead tr.row-col-headers th.col-marca  { width: 1%; white-space: nowrap; }
+    .pedido-table thead tr.row-col-headers th.col-unid   { text-align: center; width: 1%; white-space: nowrap; }
+    .pedido-table thead tr.row-col-headers th.col-drag   { width: 1%; }
+
+    /* Item rows */
+    .item-row td {
+      padding: 9px 8px;
+      border-bottom: 1px solid #181818;
+      font-size: 14px;
+      vertical-align: middle;
+      transition: background .15s;
+    }
+    .item-row:nth-child(odd) td  { background: #0d0d0d; }
+    .item-row:nth-child(even) td { background: #111; }
+    .item-row.ativo td           { background: #1b5e20 !important; }
+    .item-row.dragging           { opacity: .35; }
+
+    .item-row td.col-pedido { text-align: center; width: 1%; white-space: nowrap; }
+    .item-row td.col-marca  { color: #bbb; width: 1%; white-space: nowrap; }
+    .item-row td.col-unid   { text-align: center; color: #888; width: 1%; white-space: nowrap; }
+    .item-row td.col-drag   { width: 1%; text-align: center; padding: 9px 4px; }
+    /* Indicador de inserção */
+    .item-row.insert-above > td { border-top: 2px solid #FE7C01 !important; }
+    .item-row.insert-below > td { border-bottom: 2px solid #FE7C01 !important; }
+
+    .drag-handle {
+      color: #444;
+      cursor: grab;
+      font-size: 15px;
+      user-select: none;
+      display: inline-block;
+      touch-action: none;
+      padding: 4px 6px;
+    }
+    .drag-handle:hover { color: #888; }
+
+    /* Qty input */
+    .qty-input {
+      width: 66px;
+      padding: 6px 4px;
+      text-align: center;
+      border: 1px solid #333;
+      border-radius: 5px;
+      background: #222;
+      color: #fff;
+      font-size: 14px;
+    }
+    .qty-input:focus { outline: none; border-color: #FE7C01; background: #2a1800; }
+
+    /* Delete row btn */
+    .btn-del-row {
+      background: none;
+      border: none;
+      color: #444;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .btn-del-row:hover { color: #ff5252; background: rgba(255,82,82,.1); }
+
+    /* Add-item form row */
+    .add-item-row { display: none; }
+    .add-item-row.open { display: table-row; }
+    .add-item-row td {
+      background: #0f0f0f !important;
+      padding: 8px;
+      border-bottom: 1px solid #333;
+    }
+    .add-item-row input {
+      width: 100%;
+      padding: 6px 8px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #fff;
+      font-size: 13px;
+      font-family: Arial, sans-serif;
+    }
+    .add-item-row input:focus { outline: none; border-color: #FE7C01; }
+    .add-item-row input.input-qty  { width: 60px; text-align: center; }
+    .add-item-row input.input-unid { width: 52px; text-align: center; }
+
+    .add-btns { display: flex; gap: 5px; justify-content: center; }
+    .btn-confirm-add {
+      padding: 6px 12px;
+      background: linear-gradient(to right, #FE7C01, #FEB50A);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-cancel-add {
+      padding: 6px 9px;
+      background: none;
+      border: 1px solid #444;
+      color: #888;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-cancel-add:hover { border-color: #666; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      margin-top: 6px;
+      height: 36px;
+      border: 1.5px dashed #222;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      font-size: 12px;
+      transition: border-color .2s, color .2s, background .2s;
+    }
+    .drop-zone.drag-over {
+      border-color: #FE7C01;
+      color: #FE7C01;
+      background: rgba(254,124,1,.06);
+    }
+
+    /* ── Supplier footer ── */
+    .supplier-footer {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-add-item-trigger {
+      padding: 9px 16px;
+      background: none;
+      border: 1px dashed #333;
+      border-radius: 8px;
+      color: #555;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+      white-space: nowrap;
+      font-family: Arial, sans-serif;
+    }
+    .btn-add-item-trigger:hover { border-color: #FE7C01; color: #FE7C01; }
+
+    /* Day selector */
+    .day-select {
+      flex: 1;
+      min-width: 190px;
+      padding: 9px 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #111;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+    .day-select:focus { outline: none; border-color: #FE7C01; }
+    .day-select option { background: #1a1a1a; }
+
+    /* Copy button */
+    .btn-copy {
+      padding: 10px 22px;
+      background: linear-gradient(to right, #FE7C01, #FEB50A);
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .2s, transform .1s;
+      font-family: Arial, sans-serif;
+    }
+    .btn-copy:hover  { opacity: .88; }
+    .btn-copy:active { transform: scale(.97); }
+
+    /* Del supplier */
+    .btn-del-supplier {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.3);
+      cursor: pointer;
+      font-size: 15px;
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      line-height: 1;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color .2s;
+    }
+    .btn-del-supplier:hover { color: #ff5252; }
+
+    /* ── Add supplier ── */
+    .btn-add-supplier {
+      display: block;
+      margin: 10px auto 0;
+      padding: 13px 30px;
+      background: none;
+      border: 2px dashed #2a2a2a;
+      border-radius: 10px;
+      color: #444;
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+      font-family: Arial, sans-serif;
+    }
+    .btn-add-supplier:hover { border-color: #FC2757; color: #FC2757; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 11px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 999;
+      transition: opacity .3s;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 14px;
+      padding: 24px 20px;
+      width: 300px;
+    }
+    .modal h2 { font-size: 1rem; color: #fff; margin-bottom: 14px; }
+    .modal input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-family: Arial, sans-serif;
+    }
+    .modal input:focus { outline: none; border-color: #FE7C01; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btns .btn-ok {
+      flex: 1;
+      padding: 10px;
+      background: linear-gradient(to right, #FE7C01, #FEB50A);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+    .modal-btns .btn-no {
+      padding: 10px 14px;
+      background: none;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: #888;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+
+    @media (max-width: 600px) {
+      .pedido-table thead tr.row-col-headers th,
+      .item-row td { font-size: 12px; padding: 7px 5px; }
+      .qty-input { width: 52px; font-size: 13px; }
+      .supplier-footer { flex-direction: column; align-items: stretch; }
+      .btn-copy { border-radius: 8px; text-align: center; }
+      .day-select { min-width: 0; }
+      /* oculta coluna Marca em telas pequenas */
+      .col-marca { display: none; }
+      /* handle maior para toque */
+      .drag-handle { font-size: 20px; padding: 6px 10px; color: #666; }
+      .item-row td.col-drag { width: 36px; padding: 0; }
+      /* botões maiores */
+      .btn-add-item-trigger, .btn-add-supplier { padding: 12px 18px; font-size: 14px; }
+    }
+
+    /* ── Login Screen ── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: #000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-box {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 18px;
+      padding: 40px 30px;
+      width: 300px;
+      text-align: center;
+    }
+    .login-logo { font-size: 44px; margin-bottom: 6px; }
+    .login-box h2 {
+      font-size: 16px; color: #aaa; margin-bottom: 24px;
+      letter-spacing: 3px; font-weight: normal; text-transform: uppercase;
+    }
+    .login-box input {
+      width: 100%; padding: 13px 14px;
+      background: #1a1a1a; border: 1px solid #333; border-radius: 10px;
+      color: #fff; font-size: 22px; text-align: center;
+      margin-bottom: 14px; font-family: Arial, sans-serif;
+      letter-spacing: 6px;
+    }
+    .login-box input:focus { outline: none; border-color: #FE7C01; background: #1f1300; }
+    .login-box button {
+      width: 100%; padding: 13px;
+      background: linear-gradient(to right, #CB1847, #FC2757);
+      border: none; border-radius: 10px;
+      color: #fff; font-size: 15px; font-weight: bold;
+      cursor: pointer; font-family: Arial, sans-serif;
+      letter-spacing: 1px;
+    }
+    .login-box button:active { opacity: .85; }
+    .login-error {
+      margin-top: 12px; color: #ff5252; font-size: 13px;
+      display: none;
+    }
+
+    /* ── Readonly mode (usuários não-admin) ── */
+    body.readonly .drag-handle         { display: none; }
+    body.readonly .btn-del-row         { display: none; }
+    body.readonly .btn-del-supplier    { display: none; }
+    body.readonly .btn-add-item-trigger{ display: none; }
+    body.readonly .btn-add-supplier    { display: none; }
+    body.readonly .item-row td.col-drag:last-child { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Fixed nav -->
+<div class="nav-bar">
+  <select id="navSelect" onchange="scrollToSupplier(this.value)">
+    <option value="">Selecione um fornecedor</option>
+  </select>
+  <div class="sync-status">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">local</span>
+  </div>
+  <span id="userBadge" style="font-size:11px;color:rgba(255,255,255,.55);white-space:nowrap;"></span>
+</div>
+
+<div class="content">
+
+  <!-- Setup banner -->
+  <div class="setup-banner" id="setupBanner">
+    <strong>⚙️ Sincronização em tempo real (Firebase)</strong> — sem configurar, os dados ficam só neste navegador.<br>
+    <ol>
+      <li>Acesse <strong>console.firebase.google.com</strong> → crie um projeto → ative o <strong>Realtime Database</strong> (modo teste)</li>
+      <li>Em <em>Configurações → Seus apps → Web</em>, copie o objeto <code>firebaseConfig</code></li>
+      <li>Abra este arquivo HTML e substitua os valores em <code>FIREBASE_CONFIG</code> no script</li>
+      <li>Nas regras do banco use: <code>{ "rules": { ".read": true, ".write": true } }</code></li>
+    </ol>
+  </div>
+
+  <div id="board"></div>
+
+  <button class="btn-add-supplier" onclick="openModal()">＋ Adicionar fornecedor</button>
+</div>
+
+<div id="toast">Texto copiado!</div>
+
+<!-- Modal: novo fornecedor -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Novo Fornecedor</h2>
+    <input type="text" id="modalInput" placeholder="Nome do fornecedor" maxlength="60">
+    <div class="modal-btns">
+      <button class="btn-no"  onclick="closeModal()">Cancelar</button>
+      <button class="btn-ok"  onclick="confirmAddSupplier()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Login screen -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🍕</div>
+    <h2>Pizzaria</h2>
+    <input type="password" id="loginPwd" placeholder="••••" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <button onclick="doLogin()">Entrar</button>
+    <p class="login-error" id="loginError">Senha incorreta</p>
+  </div>
+</div>
+
+<script type="module">
+// ════════════════════════════════════════════════════════
+//  CONFIGURE AQUI — substitua pelos dados do seu projeto
+// ════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:      "COLE_AQUI",
+  authDomain:  "SEU_PROJETO.firebaseapp.com",
+  databaseURL: "https://SEU_PROJETO-default-rtdb.firebaseio.com",
+  projectId:   "SEU_PROJETO",
+};
+// ════════════════════════════════════════════════════════
+
+// Nome da empresa que aparece na mensagem copiada
+const EMPRESA = "DAME PIZZA - Carazinho, 443";
+
+const IS_CONFIGURED = !FIREBASE_CONFIG.databaseURL.includes('SEU_PROJETO');
+
+// ── Default data (apenas AURORA) ─────────────────────
+const defaultData = [
+  {
+    id: 1,
+    name: "AURORA",
+    items: [
+      { id: 101, produto: "Calabresa Reta (cx 12,5kg)",    marca: "Aurora",  unid: "cx",   qty: 0 },
+      { id: 102, produto: "Calabresa Fatiada (kg)",         marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 103, produto: "Linguiça Toscana",               marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 104, produto: "Coração de Frango",              marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 105, produto: "Peito de Frango Resfriado",      marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 106, produto: "Pernil Defumado",                marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 107, produto: "Presunto Cozido Fatiado",        marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 108, produto: "Bacon Defumado Fatiado",         marca: "Aurora",  unid: "kg",   qty: 0 },
+      { id: 109, produto: "Mortadela Fatiada",              marca: "Aurora",  unid: "kg",   qty: 0 },
+    ]
+  }
+];
+
+// ── Autenticação ──────────────────────────────────────
+// ATENÇÃO: senhas ficam visíveis no código-fonte (repositório público).
+const USERS = {
+  '222':   { name: 'LOV',   admin: false },
+  '111':   { name: 'DAME',  admin: false },
+  '54321': { name: 'ADMIN', admin: true  },
+};
+let isAdmin = false;
+
+window.doLogin = function() {
+  const pwd = document.getElementById('loginPwd').value;
+  const user = USERS[pwd];
+  if (!user) {
+    const err = document.getElementById('loginError');
+    err.style.display = 'block';
+    document.getElementById('loginPwd').value = '';
+    document.getElementById('loginPwd').focus();
+    setTimeout(() => err.style.display = 'none', 2500);
+    return;
+  }
+  isAdmin = user.admin;
+  if (!isAdmin) document.body.classList.add('readonly');
+  document.getElementById('userBadge').textContent = user.name;
+  document.getElementById('loginOverlay').classList.add('hidden');
+  initData();
+};
+
+// ── State ─────────────────────────────────────────────
+let data = [];
+let nextId = 2000;
+let pushData = () => {};
+let dragState = null; // { itemId, supplierId, insertTarget }
+
+function calcNextId() {
+  let max = 1000;
+  data.forEach(s => {
+    if (s.id > max) max = s.id;
+    s.items.forEach(it => { if (it.id > max) max = it.id; });
+  });
+  return max + 1;
+}
+function uid() { return nextId++; }
+
+// ── Firebase or localStorage ──────────────────────────
+async function initData() {
+  if (IS_CONFIGURED) {
+    document.getElementById('setupBanner').style.display = 'none';
+    setSyncStatus('connecting');
+
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js');
+    const { getDatabase, ref, set, onValue } = await import('https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js');
+
+    const app = initializeApp(FIREBASE_CONFIG);
+    const db  = getDatabase(app);
+    const dbRef = ref(db, 'pizzaria/pedidos');
+
+    onValue(dbRef, snap => {
+      const val = snap.val();
+      data = val ? val : JSON.parse(JSON.stringify(defaultData));
+      nextId = calcNextId();
+      setSyncStatus('online');
+      render();
+    }, () => setSyncStatus('offline'));
+
+    pushData = () => set(dbRef, data);
+
+  } else {
+    const raw = localStorage.getItem('pizzaria_pedidos_v1');
+    data = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(defaultData));
+    nextId = calcNextId();
+    pushData = () => localStorage.setItem('pizzaria_pedidos_v1', JSON.stringify(data));
+    setSyncStatus('local');
+    render();
+  }
+}
+
+function setSyncStatus(state) {
+  const dot   = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  dot.className = 'sync-dot';
+  const map = {
+    online:     ['online',  'Sincronizado'],
+    offline:    ['offline', 'Sem conexão'],
+    connecting: ['',        'Conectando…'],
+    local:      ['',        'Só neste navegador'],
+  };
+  const [cls, txt] = map[state] || ['', state];
+  if (cls) dot.classList.add(cls);
+  label.textContent = txt;
+}
+
+// ── Nav dropdown ──────────────────────────────────────
+function rebuildNav() {
+  const sel = document.getElementById('navSelect');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Selecione um fornecedor</option>';
+  data.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = 'supplier-' + s.id;
+    opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
+  sel.value = prev;
+}
+
+window.scrollToSupplier = (id) => {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// ── Render ────────────────────────────────────────────
+function render() {
+  const board = document.getElementById('board');
+
+  // remember which add-item forms are open + qty values
+  const openForms = new Set();
+  const qtyValues = {};
+  board.querySelectorAll('.add-item-row.open').forEach(r => openForms.add(r.dataset.supplierId));
+  board.querySelectorAll('.qty-input').forEach(inp => {
+    qtyValues[inp.dataset.itemId] = inp.value;
+  });
+
+  board.innerHTML = '';
+  data.forEach(s => board.appendChild(buildSection(s, openForms, qtyValues)));
+  rebuildNav();
+}
+
+function buildSection(supplier, openForms, qtyValues) {
+  const section = document.createElement('div');
+  section.className = 'supplier-section';
+  section.id = 'supplier-' + supplier.id;
+
+  // Table
+  const table = document.createElement('table');
+  table.className = 'pedido-table';
+
+  // thead
+  const thead = document.createElement('thead');
+
+  // Row 1: supplier name
+  const trName = document.createElement('tr');
+  trName.className = 'row-supplier-name';
+  const thName = document.createElement('th');
+  thName.colSpan = 6;
+  thName.innerHTML = `<span class="supplier-name-text">${supplier.name}</span>`;
+  const delSupBtn = document.createElement('button');
+  delSupBtn.className = 'btn-del-supplier';
+  delSupBtn.title = 'Remover fornecedor';
+  delSupBtn.textContent = '✕';
+  delSupBtn.onclick = () => removeSupplier(supplier.id);
+  thName.appendChild(delSupBtn);
+  trName.appendChild(thName);
+
+  // Row 2: column headers
+  const trCols = document.createElement('tr');
+  trCols.className = 'row-col-headers';
+  [['Pedido','col-pedido'], ['Produto','col-produto expand'], ['Marca','col-marca'], ['Unid.','col-unid'], ['','col-drag'], ['','col-drag']].forEach(([txt, cls]) => {
+    const th = document.createElement('th');
+    th.className = cls;
+    th.textContent = txt;
+    trCols.appendChild(th);
+  });
+
+  thead.appendChild(trName);
+  thead.appendChild(trCols);
+  table.appendChild(thead);
+
+  // tbody
+  const tbody = document.createElement('tbody');
+  tbody.dataset.supplierId = supplier.id;
+  tbody.addEventListener('dragover',  onTbodyDragOver);
+  tbody.addEventListener('dragleave', onTbodyDragLeave);
+  tbody.addEventListener('drop',      onTbodyDrop);
+  supplier.items.forEach(item => tbody.appendChild(buildItemRow(item, supplier.id, qtyValues)));
+
+  // Add-item form row
+  const addRow = document.createElement('tr');
+  addRow.className = 'add-item-row' + (openForms.has(String(supplier.id)) ? ' open' : '');
+  addRow.dataset.supplierId = supplier.id;
+  addRow.innerHTML = `
+    <td class="col-pedido">
+      <input class="input-qty" type="number" min="0" placeholder="Qtd">
+    </td>
+    <td class="col-produto">
+      <input type="text" placeholder="Nome do produto" maxlength="80">
+    </td>
+    <td class="col-marca">
+      <input type="text" placeholder="Marca" maxlength="40">
+    </td>
+    <td class="col-unid">
+      <input class="input-unid" type="text" placeholder="Unid" maxlength="10">
+    </td>
+    <td colspan="2">
+      <div class="add-btns">
+        <button class="btn-confirm-add">OK</button>
+        <button class="btn-cancel-add">✕</button>
+      </div>
+    </td>
+  `;
+  addRow.querySelectorAll('input').forEach(inp =>
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') confirmAddItem(supplier.id); })
+  );
+  addRow.querySelector('.btn-confirm-add').onclick = () => confirmAddItem(supplier.id);
+  addRow.querySelector('.btn-cancel-add').onclick  = () => closeAddRow(supplier.id);
+
+  tbody.appendChild(addRow);
+  table.appendChild(tbody);
+  section.appendChild(table);
+
+  // Footer: add-item trigger + day select + copy
+  const footer = document.createElement('div');
+  footer.className = 'supplier-footer';
+
+  const addTrigger = document.createElement('button');
+  addTrigger.className = 'btn-add-item-trigger';
+  addTrigger.textContent = '＋ Item';
+  addTrigger.onclick = () => openAddRow(supplier.id);
+
+  const daySelect = document.createElement('select');
+  daySelect.className = 'day-select';
+  daySelect.id = 'dia-' + supplier.id;
+  daySelect.innerHTML = `
+    <option value="">Selecione o dia da semana</option>
+    <option>Segunda</option><option>Terça</option><option>Quarta</option>
+    <option>Quinta</option><option>Sexta</option><option>Sábado</option>
+  `;
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn-copy';
+  copyBtn.textContent = 'COPIAR ' + supplier.name;
+  copyBtn.onclick = () => handleCopy(supplier.id);
+
+  footer.appendChild(addTrigger);
+  footer.appendChild(daySelect);
+  footer.appendChild(copyBtn);
+  section.appendChild(footer);
+
+  return section;
+}
+
+function buildItemRow(item, supplierId, qtyValues) {
+  const tr = document.createElement('tr');
+  tr.className = 'item-row';
+  tr.dataset.itemId = item.id;
+  tr.dataset.supplierId = supplierId;
+
+  const restoredQty = qtyValues[item.id] !== undefined ? qtyValues[item.id] : (item.qty || 0);
+  if (+restoredQty > 0) tr.classList.add('ativo');
+
+  // drag handle
+  const tdDrag = document.createElement('td');
+  tdDrag.className = 'col-drag';
+  tdDrag.innerHTML = '<span class="drag-handle">⠿</span>';
+  tr.appendChild(tdDrag);
+
+  // qty input
+  const tdQty = document.createElement('td');
+  tdQty.className = 'col-pedido';
+  const qtyInp = document.createElement('input');
+  qtyInp.type = 'number';
+  qtyInp.className = 'qty-input';
+  qtyInp.min = 0;
+  qtyInp.step = 1;
+  qtyInp.value = restoredQty || '';
+  qtyInp.placeholder = '0';
+  qtyInp.dataset.itemId = item.id;
+  qtyInp.addEventListener('mousedown', e => e.stopPropagation());
+  qtyInp.addEventListener('input', () => {
+    const val = parseFloat(qtyInp.value.replace(',', '.'));
+    tr.classList.toggle('ativo', !isNaN(val) && val > 0);
+    saveQty(supplierId, item.id, qtyInp.value);
+  });
+  tdQty.appendChild(qtyInp);
+  tr.appendChild(tdQty);
+
+  // produto
+  const tdProd = document.createElement('td');
+  tdProd.className = 'col-produto';
+  tdProd.textContent = item.produto;
+  tr.appendChild(tdProd);
+
+  // marca
+  const tdMarca = document.createElement('td');
+  tdMarca.className = 'col-marca';
+  tdMarca.textContent = item.marca;
+  tr.appendChild(tdMarca);
+
+  // unid
+  const tdUnid = document.createElement('td');
+  tdUnid.className = 'col-unid';
+  tdUnid.textContent = item.unid;
+  tr.appendChild(tdUnid);
+
+  // delete btn
+  const tdDel = document.createElement('td');
+  tdDel.className = 'col-drag';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-del-row';
+  delBtn.title = 'Remover item';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('mousedown', e => e.stopPropagation());
+  delBtn.onclick = () => removeItem(supplierId, item.id);
+  tdDel.appendChild(delBtn);
+  tr.appendChild(tdDel);
+
+  // drag events — desktop: habilita draggable só ao segurar o handle
+  const dragHandle = tdDrag.querySelector('.drag-handle');
+  dragHandle.addEventListener('mousedown', () => { if (isAdmin) tr.draggable = true; });
+  dragHandle.addEventListener('touchstart', e => { if (isAdmin) onHandleTouchStart(e, tr, item.id, supplierId); }, { passive: false });
+  tr.addEventListener('dragstart', onRowDragStart);
+  tr.addEventListener('dragend',   (e) => { tr.draggable = false; onRowDragEnd(e); });
+
+  return tr;
+}
+
+// ── Touch Drag (mobile) ──────────────────────────────
+let touchDragState = null;
+
+function onHandleTouchStart(e, tr, itemId, supplierId) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect  = tr.getBoundingClientRect();
+
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `
+    position:fixed;pointer-events:none;opacity:.9;z-index:1000;
+    min-width:180px;max-width:260px;padding:10px 14px;
+    top:${touch.clientY - 22}px;left:${rect.left + 10}px;
+    background:#1a1a1a;border:1px solid #FE7C01;border-radius:8px;
+    box-shadow:0 4px 20px rgba(0,0,0,.8);font-size:14px;color:#fff;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+  ghost.textContent = tr.querySelector('.col-produto')?.textContent?.trim() || 'Item';
+  document.body.appendChild(ghost);
+
+  tr.classList.add('dragging');
+  touchDragState = { itemId, supplierId, ghost, tr, insertTarget: null };
+}
+
+document.addEventListener('touchmove', e => {
+  if (!touchDragState) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const { ghost } = touchDragState;
+  ghost.style.top  = (touch.clientY - ghost.offsetHeight / 2) + 'px';
+  ghost.style.left = (touch.clientX - ghost.offsetWidth  / 2) + 'px';
+
+  ghost.style.display = 'none';
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  ghost.style.display = '';
+  clearInsertIndicators();
+  const tbody = el?.closest?.('tbody[data-supplier-id]') || null;
+  if (tbody) {
+    const tgtSupplierId = +tbody.dataset.supplierId;
+    const { beforeItemId, indicatorRow, pos } = getInsertPosition(tbody, touch.clientY);
+    if (indicatorRow) indicatorRow.classList.add(pos === 'above' ? 'insert-above' : 'insert-below');
+    touchDragState.insertTarget = { supplierId: tgtSupplierId, beforeItemId };
+  } else {
+    touchDragState.insertTarget = null;
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (!touchDragState) return;
+  const { ghost, tr: dragTr, insertTarget, itemId, supplierId } = touchDragState;
+
+  ghost.remove();
+  dragTr.classList.remove('dragging');
+  clearInsertIndicators();
+
+  if (insertTarget) {
+    doMoveItem(itemId, supplierId, insertTarget.supplierId, insertTarget.beforeItemId);
+  }
+  touchDragState = null;
+});
+
+// ── Save qty (debounced) ──────────────────────────────
+let saveTimer;
+function saveQty(supplierId, itemId, val) {
+  const s = data.find(s => s.id === supplierId);
+  const it = s?.items.find(i => i.id === itemId);
+  if (!it) return;
+  it.qty = val === '' ? 0 : +val;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushData, 600);
+}
+
+// ── Add / Remove ──────────────────────────────────────
+function openAddRow(supplierId) {
+  const row = document.querySelector(`.add-item-row[data-supplier-id="${supplierId}"]`);
+  if (!row) return;
+  row.classList.add('open');
+  row.querySelector('input[type="text"]').focus();
+}
+
+function closeAddRow(supplierId) {
+  const row = document.querySelector(`.add-item-row[data-supplier-id="${supplierId}"]`);
+  if (!row) return;
+  row.classList.remove('open');
+  row.querySelectorAll('input').forEach(i => i.value = '');
+}
+
+function confirmAddItem(supplierId) {
+  if (!isAdmin) return;
+  const row = document.querySelector(`.add-item-row[data-supplier-id="${supplierId}"]`);
+  const inputs = row.querySelectorAll('input');
+  const qty    = inputs[0].value !== '' ? +inputs[0].value : 0;
+  const produto= inputs[1].value.trim();
+  const marca  = inputs[2].value.trim();
+  const unid   = inputs[3].value.trim();
+  if (!produto) { inputs[1].focus(); return; }
+
+  const supplier = data.find(s => s.id === supplierId);
+  if (!supplier) return;
+  supplier.items.push({ id: uid(), produto, marca, unid, qty });
+  pushData();
+  render();
+}
+
+function removeItem(supplierId, itemId) {
+  if (!isAdmin) return;
+  const s = data.find(s => s.id === supplierId);
+  if (!s) return;
+  s.items = s.items.filter(it => it.id !== itemId);
+  pushData();
+  render();
+}
+
+function removeSupplier(supplierId) {
+  if (!isAdmin) return;
+  const s = data.find(s => s.id === supplierId);
+  if (!s) return;
+  const n = s.items.length;
+  if (n > 0 && !confirm(`Remover "${s.name}" e todos os seus ${n} itens?`)) return;
+  data = data.filter(s => s.id !== supplierId);
+  pushData();
+  render();
+}
+
+// ── Drag & Drop ───────────────────────────────────────
+function clearInsertIndicators() {
+  document.querySelectorAll('.insert-above, .insert-below').forEach(r => {
+    r.classList.remove('insert-above', 'insert-below');
+  });
+}
+
+function getInsertPosition(tbody, clientY) {
+  const rows = [...tbody.querySelectorAll('.item-row')].filter(
+    r => !r.classList.contains('dragging') && !r.classList.contains('add-item-row')
+  );
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      return { beforeItemId: +row.dataset.itemId, indicatorRow: row, pos: 'above' };
+    }
+  }
+  const last = rows[rows.length - 1];
+  return { beforeItemId: null, indicatorRow: last || null, pos: 'below' };
+}
+
+function doMoveItem(itemId, srcId, tgtId, beforeItemId) {
+  const src = data.find(s => s.id === srcId);
+  const tgt = data.find(s => s.id === tgtId);
+  if (!src || !tgt) return;
+  const idx = src.items.findIndex(it => it.id === itemId);
+  if (idx === -1) return;
+  const [item] = src.items.splice(idx, 1);
+  if (beforeItemId === null) {
+    tgt.items.push(item);
+  } else {
+    const at = tgt.items.findIndex(it => it.id === beforeItemId);
+    tgt.items.splice(at === -1 ? tgt.items.length : at, 0, item);
+  }
+  pushData();
+  render();
+}
+
+function onRowDragStart(e) {
+  dragState = {
+    itemId:       +e.currentTarget.dataset.itemId,
+    supplierId:   +e.currentTarget.dataset.supplierId,
+    insertTarget: null,
+  };
+  setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onRowDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  clearInsertIndicators();
+  dragState = null;
+}
+
+function onTbodyDragOver(e) {
+  if (!dragState) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  clearInsertIndicators();
+  const supplierId = +e.currentTarget.dataset.supplierId;
+  const { beforeItemId, indicatorRow, pos } = getInsertPosition(e.currentTarget, e.clientY);
+  if (indicatorRow) indicatorRow.classList.add(pos === 'above' ? 'insert-above' : 'insert-below');
+  dragState.insertTarget = { supplierId, beforeItemId };
+}
+
+function onTbodyDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    clearInsertIndicators();
+    if (dragState) dragState.insertTarget = null;
+  }
+}
+
+function onTbodyDrop(e) {
+  e.preventDefault();
+  clearInsertIndicators();
+  if (!dragState || !dragState.insertTarget) return;
+  const { supplierId: tgtId, beforeItemId } = dragState.insertTarget;
+  doMoveItem(dragState.itemId, dragState.supplierId, tgtId, beforeItemId);
+  dragState = null;
+}
+
+// ── Copy ──────────────────────────────────────────────
+function handleCopy(supplierId) {
+  const dayEl = document.getElementById('dia-' + supplierId);
+  if (!dayEl.value) {
+    alert('Selecione o dia da semana antes de copiar.');
+    dayEl.focus();
+    return;
+  }
+
+  const s = data.find(s => s.id === supplierId);
+  if (!s) return;
+
+  // collect live qty values from DOM
+  const linhas = [];
+  document.querySelectorAll(`.item-row[data-supplier-id="${supplierId}"]`).forEach(tr => {
+    const qtyInp = tr.querySelector('.qty-input');
+    const val    = parseFloat((qtyInp?.value || '0').replace(',', '.'));
+    if (isNaN(val) || val <= 0) return;
+
+    const cells = tr.querySelectorAll('td');
+    // col order: drag | qty | produto | marca | unid | del
+    const produto = cells[2]?.textContent.trim() || '';
+    const marca   = cells[3]?.textContent.trim() || '';
+    const unid    = cells[4]?.textContent.trim() || '';
+
+    linhas.push(`${produto}${marca ? ' ' + marca : ''} - ${val}${unid}`);
+  });
+
+  if (linhas.length === 0) {
+    alert('Nenhum item com quantidade preenchida.');
+    return;
+  }
+
+  const texto = [
+    `*PEDIDO ${s.name}*`,
+    `*${EMPRESA}*`,
+    `*Entrega ${dayEl.value} após 16:30*`,
+    '',
+    ...linhas,
+  ].join('\n');
+
+  copiarTexto(texto);
+}
+
+function copiarTexto(texto) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(texto)
+      .then(showToast)
+      .catch(() => fallbackCopy(texto));
+  } else {
+    fallbackCopy(texto);
+  }
+}
+
+function fallbackCopy(texto) {
+  const ta = document.createElement('textarea');
+  ta.value = texto;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try {
+    document.execCommand('copy');
+    showToast();
+  } catch {
+    window.prompt('Copie o texto abaixo:', texto);
+  }
+  document.body.removeChild(ta);
+}
+
+let toastTimer;
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ── Modal ─────────────────────────────────────────────
+window.openModal = () => {
+  if (!isAdmin) return;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('modalInput').value = '';
+  setTimeout(() => document.getElementById('modalInput').focus(), 50);
+};
+window.closeModal = () => {
+  document.getElementById('modalOverlay').classList.remove('open');
+};
+window.confirmAddSupplier = () => {
+  const name = document.getElementById('modalInput').value.trim().toUpperCase();
+  if (!name) { document.getElementById('modalInput').focus(); return; }
+  data.push({ id: uid(), name, items: [] });
+  pushData();
+  render();
+  closeModal();
+};
+
+document.getElementById('modalInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter')  confirmAddSupplier();
+  if (e.key === 'Escape') closeModal();
+});
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>
