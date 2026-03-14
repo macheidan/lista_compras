@@ -574,6 +574,12 @@ const EMPRESA = "DAME PIZZA - Carazinho, 443";
 
 const IS_CONFIGURED = !FIREBASE_CONFIG.databaseURL.includes('SEU_PROJETO');
 
+// Inicia o download do SDK Firebase imediatamente (antes do login)
+const firebaseReady = IS_CONFIGURED ? Promise.all([
+  import('https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js'),
+  import('https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js'),
+]) : null;
+
 // ── Default data (apenas AURORA) ─────────────────────
 const defaultData = [
   {
@@ -618,8 +624,7 @@ async function initData() {
     document.getElementById('setupBanner').style.display = 'none';
     setSyncStatus('connecting');
 
-    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js');
-    const { getDatabase, ref, set, onValue } = await import('https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js');
+    const [{ initializeApp }, { getDatabase, ref, set, onValue }] = await firebaseReady;
 
     const app = initializeApp(FIREBASE_CONFIG);
     const db  = getDatabase(app);
