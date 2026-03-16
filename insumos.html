@@ -115,7 +115,8 @@
       padding: 8px;
       border-bottom: 1px solid #333;
     }
-    .pedido-table thead tr.row-col-headers th.col-pedido { text-align: center; width: 1%; white-space: nowrap; }
+    .pedido-table thead tr.row-col-headers th.col-pedido  { text-align: center; width: 1%; white-space: nowrap; }
+    .pedido-table thead tr.row-col-headers th.col-produto { width: 100%; }
     .pedido-table thead tr.row-col-headers th.col-marca  { width: 1%; white-space: nowrap; }
     .pedido-table thead tr.row-col-headers th.col-unid   { text-align: center; width: 1%; white-space: nowrap; }
     .pedido-table thead tr.row-col-headers th.col-drag   { width: 1%; }
@@ -550,7 +551,7 @@ function doLogin() {
   if (!user.admin) document.body.classList.add('readonly');
   document.getElementById('userBadge').textContent = user.name;
   document.getElementById('loginOverlay').classList.add('hidden');
-  window._startApp(user.admin);
+  window._startApp(user.admin, user.name);
 }
 </script>
 
@@ -569,8 +570,11 @@ const FIREBASE_CONFIG = {
 };
 // ════════════════════════════════════════════════════════
 
-// Nome da empresa que aparece na mensagem copiada
-const EMPRESA = "DAME PIZZA - Carazinho, 443";
+const EMPRESAS = {
+  'LOV':  'LOV PIZZA - Anita Garibaldi, 1593',
+  'DAME': 'DAME PIZZA - Carazinho, 443',
+};
+let currentUser = '';
 
 const IS_CONFIGURED = !FIREBASE_CONFIG.databaseURL.includes('SEU_PROJETO');
 
@@ -661,7 +665,7 @@ async function initData() {
   }
 }
 
-window._startApp = (admin) => { isAdmin = admin; initData(); };
+window._startApp = (admin, userName) => { isAdmin = admin; currentUser = userName; initData(); };
 
 function setSyncStatus(state) {
   const dot   = document.getElementById('syncDot');
@@ -743,7 +747,7 @@ function buildSection(supplier, openForms, qtyValues) {
   // Row 2: column headers
   const trCols = document.createElement('tr');
   trCols.className = 'row-col-headers';
-  [['Pedido','col-pedido'], ['Produto','col-produto expand'], ['Marca','col-marca'], ['Unid.','col-unid'], ['','col-drag'], ['','col-drag']].forEach(([txt, cls]) => {
+  [['','col-drag'], ['Pedido','col-pedido'], ['Produto','col-produto expand'], ['Marca','col-marca'], ['Unid.','col-unid'], ['','col-drag']].forEach(([txt, cls]) => {
     const th = document.createElement('th');
     th.className = cls;
     th.textContent = txt;
@@ -833,7 +837,7 @@ function buildItemRow(item, supplierId, qtyValues) {
   tr.dataset.itemId = item.id;
   tr.dataset.supplierId = supplierId;
 
-  const restoredQty = qtyValues[item.id] !== undefined ? qtyValues[item.id] : (item.qty || 0);
+  const restoredQty = qtyValues[item.id] ?? '';
   if (+restoredQty > 0) tr.classList.add('ativo');
 
   // drag handle
@@ -1139,13 +1143,12 @@ function handleCopy(supplierId) {
     return;
   }
 
-  const texto = [
-    `*PEDIDO ${s.name}*`,
-    `*${EMPRESA}*`,
-    `*Entrega ${dayEl.value} após 16:30*`,
-    '',
-    ...linhas,
-  ].join('\n');
+  const empresa = EMPRESAS[currentUser];
+  const cabecalho = [`*PEDIDO ${s.name}*`];
+  if (empresa) cabecalho.push(`*${empresa}*`);
+  cabecalho.push(`*Entrega ${dayEl.value} após 16:30*`, '');
+
+  const texto = [...cabecalho, ...linhas].join('\n');
 
   copiarTexto(texto);
 }
