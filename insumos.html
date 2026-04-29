@@ -532,14 +532,20 @@
 
 <script>
 // ── Login (script normal — acessível pelo onclick) ────
+const PWD_SALT = 'pizzaria-insumos-v1';
 const USERS = {
-  '222':   { name: 'LOV',   admin: false },
-  '111':   { name: 'DAME',  admin: false },
-  '54321': { name: 'ADMIN', admin: true  },
+  'c5106888876d201f3dfa4a5ac1b7d8f36323bf70e21361b027f8faa23c4e5ae5': { name: 'LOV',   admin: false },
+  'c580fb77052d448d03aa88ef47f50b61a11a5859f8bfd50f4efec499aa489bf8': { name: 'DAME',  admin: false },
+  '4f6c3017df8fc2cf59127bf41c9188de2770bfef8f03748efefb543904fce38b': { name: 'ADMIN', admin: true  },
 };
-function doLogin() {
+async function hashPwd(pwd) {
+  const buf = new TextEncoder().encode(PWD_SALT + pwd);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function doLogin() {
   const pwd  = document.getElementById('loginPwd').value;
-  const user = USERS[pwd];
+  const user = USERS[await hashPwd(pwd)];
   if (!user) {
     const err = document.getElementById('loginError');
     err.style.display = 'block';

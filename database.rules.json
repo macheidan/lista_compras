@@ -1,0 +1,12 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "pizzaria": {
+      "pedidos": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
